@@ -3,8 +3,27 @@ from telebot import types
 import time
 import json
 import os
+from flask import Flask
+from threading import Thread
+
+# --- WEB SERVER FOR RENDER (ANTI-SLEEP) ---
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot is Running 24/7!"
+
+def run():
+    # Render automatically PORT environment variable deta hai
+    port = int(os.environ.get("PORT", 10000)) 
+    app.run(host='0.0.0.0', port=port)
+
+def keep_alive():
+    t = Thread(target=run)
+    t.start()
 
 # --- CONFIGURATION ---
+# Aapka token wahi hai jo aapne bataya tha
 BOT_TOKEN = "8377103854:AAEAnZ8MC7L0uEkQAEPgS_XSrCiSmgeV3D8"
 bot = telebot.TeleBot(BOT_TOKEN)
 
@@ -37,8 +56,11 @@ ALL_CATS = set(PAGE_1 + PAGE_2 + PAGE_3) - {"2nd Page💞", "3rd Page👣", "⬅
 
 # Database Setup
 if os.path.exists(DB_FILE):
-    with open(DB_FILE, "r") as f:
-        PFP_DATA = json.load(f)
+    try:
+        with open(DB_FILE, "r") as f:
+            PFP_DATA = json.load(f)
+    except:
+        PFP_DATA = {cat: [] for cat in ALL_CATS}
 else:
     PFP_DATA = {cat: [] for cat in ALL_CATS}
 
@@ -51,7 +73,7 @@ def get_kb(btns):
     markup.add(*[types.KeyboardButton(b) for b in btns])
     return markup
 
-# --- START COMMAND (NEW WELCOME MESSAGE) ---
+# --- START COMMAND ---
 @bot.message_handler(commands=['start'])
 def start(message):
     new_welcome_msg = (
@@ -62,7 +84,6 @@ def start(message):
         "𝐈𝐭  𝐇𝐚𝐬  𝐁𝐞𝐬𝐭  𝐌𝐞𝐭𝐡𝐬,  𝐌𝐨𝐝𝐬,  𝐈𝐧𝐬𝐭𝐚  𝐓𝐫𝐢𝐜𝐤𝐬  𝐄𝐭𝐜..  &  𝐌𝐚𝐧𝐲 𝐌𝐨𝐫𝐞 𝐓𝐡𝐢𝐧𝐠𝐬..... ❤️‍🔥\n\n"
         "𝐒𝐮𝐩𝐩𝐨𝐫𝐭 𝐌𝐞 𝐆𝐮𝐲𝐬 🥺🫶🏻"
     )
-    
     bot.send_message(message.chat.id, new_welcome_msg, reply_markup=get_kb(PAGE_1))
 
 # --- NAVIGATION ---
@@ -92,26 +113,17 @@ def callback_inline(call):
         cat = call.data.split("_")[1]
         file_id = upload_session.get(call.from_user.id)
         if file_id:
+            if cat not in PFP_DATA: PFP_DATA[cat] = []
             PFP_DATA[cat].append(file_id)
             save_db()
             bot.edit_message_text(f"✅ Photo Saved to {cat}!", call.message.chat.id, call.message.message_id)
-
     elif call.data.startswith("del_"):
         cat = call.data.split("_")[1]
         PFP_DATA[cat] = []
         save_db()
         bot.edit_message_text(f"🗑 {cat} khali ho gaya!", call.message.chat.id, call.message.message_id)
 
-# --- DELETE COMMAND ---
-@bot.message_handler(commands=['delete'])
-def delete_photos(message):
-    if message.from_user.id in ADMIN_IDS:
-        markup = types.InlineKeyboardMarkup(row_width=2)
-        btns = [types.InlineKeyboardButton(f"Empty {cat}", callback_data=f"del_{cat}") for cat in list(ALL_CATS)[:10]]
-        markup.add(*btns)
-        bot.send_message(message.chat.id, "🗑 **Admin Panel: Select category to delete photos:**", reply_markup=markup)
-
-# --- USER CLICK (ONLY PHOTOS) ---
+# --- USER CLICK ---
 @bot.message_handler(func=lambda m: m.text in ALL_CATS)
 def handle_cat(message):
     cat = message.text
@@ -122,7 +134,11 @@ def handle_cat(message):
         try:
             bot.send_photo(message.chat.id, img)
             time.sleep(0.3)
-        except Exception: continue
+        except: continue
 
-print("🚀 Bot is LIVE with New Custom Welcome Message!")
-bot.infinity_polling()
+# --- MAIN RUN ---
+if __name__ == "__main__":
+    keep_alive() # Starts Flask server
+    print("🚀 PFP Bot is LIVE on Render!")
+    # Using infinity_polling with timeout for better stability on cloud
+    bot.infinity_polling(timeout=10, long_polling_timeout=5)
