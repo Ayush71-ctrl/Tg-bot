@@ -24,7 +24,7 @@ def keep_alive():
 
 # --- CONFIGURATION ---
 # Aapka token wahi hai jo aapne bataya tha
-BOT_TOKEN = "8377103854:AAEAnZ8MC7L0uEkQAEPgS_XSrCiSmgeV3D8"
+BOT_TOKEN = "8761862736:AAGHzMBJsCkzhQjxOFSUdM4XS-TSPyGMhxk"
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # Admins: Ayush aur uska dost
